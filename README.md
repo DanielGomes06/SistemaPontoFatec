@@ -49,6 +49,7 @@ src/
   main.jsx     # ponto de entrada
   index.css    # importa o Tailwind
   App.jsx      # painel de controle de acesso
+  firebase.js  # inicialização do Firebase
 firmware/
   ponto_rfid/ponto_rfid.ino   # sketch do ESP32 (Wokwi / placa real)
   diagram.json                # circuito do Wokwi
@@ -57,4 +58,17 @@ firmware/
 
 ## Observações
 
-- Os crachás cadastrados ficam apenas na memória: ao recarregar a página, voltam aos 3 de exemplo.
+- Os crachás e os registros de acesso ficam no **Firebase Realtime Database** (projeto `SistemaPontoFatec`),
+  então continuam lá ao recarregar a página. Não há mais crachás de exemplo: cadastre pelo painel.
+
+## Firebase
+
+Configuração em `src/firebase.js`. Estrutura do banco:
+
+```
+usuarios/<id>   -> name, role, uid, status
+acessos/<id>    -> name, role, uid, timestamp, authorized
+```
+
+As regras do banco estão em modo de teste (expiram em ~30 dias). Depois disso, renove em
+Realtime Database > Regras ou ative Authentication.

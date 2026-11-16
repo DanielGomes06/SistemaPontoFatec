@@ -12,6 +12,8 @@ import {
   Trash2,
   UserPlus
 } from 'lucide-react';
+import { ref, onValue, push, set, remove, query, limitToLast } from 'firebase/database';
+import { db } from './firebase';
 
 // Normaliza o UID para comparação: "a1:b2 c3-d4" -> "A1B2C3D4"
 const normalizeUid = (uid) => uid.toUpperCase().replace(/[^0-9A-F]/g, '');
@@ -21,12 +23,8 @@ export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [serialLog, setSerialLog] = useState([]);
 
-  // Base de Dados Simulada (Crachás Autorizados)
-  const [authorizedUsers, setAuthorizedUsers] = useState([
-    { id: '1', name: 'Prof. Carlos Eduardo', role: 'Docente', uid: '01 02 03 04', status: 'Ativo' },
-    { id: '2', name: 'Ana Silva', role: 'Aluno - DSM', uid: 'A1 B2 C3 D4', status: 'Ativo' },
-    { id: '3', name: 'Marcos Souza', role: 'Administrativo', uid: 'FE 12 89 00', status: 'Ativo' }
-  ]);
+  // Crachás autorizados (carregados do Firebase Realtime Database)
+  const [authorizedUsers, setAuthorizedUsers] = useState([]);
 
   // Logs de Acesso
   const [accessLogs, setAccessLogs] = useState([]);
@@ -49,6 +47,26 @@ export default function App() {
   useEffect(() => {
     usersRef.current = authorizedUsers;
   }, [authorizedUsers]);
+
+  // Leitura em tempo real do Firebase: crachás e registros de acesso
+  useEffect(() => {
+    const unsubUsers = onValue(ref(db, 'usuarios'), (snap) => {
+      const lista = [];
+      snap.forEach((c) => { lista.push({ id: c.key, ...c.val() }); });
+      setAuthorizedUsers(lista);
+    });
+
+    const unsubLogs = onValue(query(ref(db, 'acessos'), limitToLast(50)), (snap) => {
+      const lista = [];
+      snap.forEach((c) => { lista.push({ id: c.key, ...c.val() }); });
+      setAccessLogs(lista.reverse());
+    });
+
+    return () => {
+      unsubUsers();
+      unsubLogs();
+    };
+  }, []);
 
   // Encerra a conexão ao sair da página
   useEffect(() => {
@@ -86,30 +104,26 @@ export default function App() {
     const formattedDate = now.toLocaleDateString('pt-BR');
 
     if (matchedUser) {
-      // Registrar log positivo
-      const newLog = {
-        id: `${Date.now()}-${Math.random()}`,
+      // Registrar log positivo no Firebase
+      push(ref(db, 'acessos'), {
         name: matchedUser.name,
         role: matchedUser.role,
         uid: uid,
         timestamp: `${formattedDate} ${formattedTime}`,
         authorized: true
-      };
-      setAccessLogs((prev) => [newLog, ...prev]);
+      }).catch((err) => console.error('Erro ao gravar acesso no Firebase:', err));
 
       // Enviar comando para abrir catraca no ESP32
       sendSerialCommand('OPEN\n');
     } else {
-      // Registrar log negativo
-      const newLog = {
-        id: `${Date.now()}-${Math.random()}`,
+      // Registrar log negativo no Firebase
+      push(ref(db, 'acessos'), {
         name: 'Não Cadastrado',
         role: 'Desconhecido',
         uid: uid,
         timestamp: `${formattedDate} ${formattedTime}`,
         authorized: false
-      };
-      setAccessLogs((prev) => [newLog, ...prev]);
+      }).catch((err) => console.error('Erro ao gravar acesso no Firebase:', err));
 
       // Enviar comando para negar no ESP32
       sendSerialCommand('DENY\n');
@@ -214,27 +228,25 @@ export default function App() {
     }
   };
 
-  // Adicionar novo usuário
+  // Adicionar novo usuário (grava no Firebase)
   const handleAddUser = (e) => {
     e.preventDefault();
     if (!newName || !newUid) return;
 
-    const newUser = {
-      id: Date.now().toString(),
+    set(push(ref(db, 'usuarios')), {
       name: newName,
       role: newRole,
       uid: newUid.toUpperCase().trim(),
       status: 'Ativo'
-    };
+    }).catch((err) => console.error('Erro ao cadastrar crachá:', err));
 
-    setAuthorizedUsers((prev) => [...prev, newUser]);
     setNewName('');
     setNewUid('');
   };
 
-  // Remover usuário
+  // Remover usuário (apaga do Firebase)
   const handleRemoveUser = (id) => {
-    setAuthorizedUsers((prev) => prev.filter((u) => u.id !== id));
+    remove(ref(db, `usuarios/${id}`)).catch((err) => console.error('Erro ao remover crachá:', err));
   };
 
   return (
