@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Usb,
   Users,
@@ -41,18 +41,16 @@ export default function App() {
   const readLoopRef = useRef(null);
   const closingRef = useRef(false);
 
-  // Mantém sempre a lista de usuários mais recente acessível ao loop de leitura.
-  // (Sem isso, o loop serial enxergaria apenas a lista do momento da conexão.)
-  const usersRef = useRef(authorizedUsers);
-  useEffect(() => {
-    usersRef.current = authorizedUsers;
-  }, [authorizedUsers]);
+  // Lista de crachás sempre atualizada para o loop de leitura serial
+  // (o loop é criado uma vez, na conexão, e não enxergaria o estado novo do React)
+  const usersRef = useRef([]);
 
   // Leitura em tempo real do Firebase: crachás e registros de acesso
   useEffect(() => {
     const unsubUsers = onValue(ref(db, 'usuarios'), (snap) => {
       const lista = [];
       snap.forEach((c) => { lista.push({ id: c.key, ...c.val() }); });
+      usersRef.current = lista;
       setAuthorizedUsers(lista);
     });
 
@@ -93,41 +91,23 @@ export default function App() {
     }
   };
 
-  // Validação no React + Envio do comando de volta ao ESP32
+  // Valida o UID, registra o acesso no Firebase e responde ao ESP32 (OPEN ou DENY)
   const validateAndRespondAccess = (uid) => {
     const matchedUser = usersRef.current.find(
-      (user) => normalizeUid(user.uid) === normalizeUid(uid) && user.status === 'Ativo'
+      (user) => normalizeUid(user.uid) === normalizeUid(uid)
     );
-
     const now = new Date();
-    const formattedTime = now.toLocaleTimeString('pt-BR');
-    const formattedDate = now.toLocaleDateString('pt-BR');
 
-    if (matchedUser) {
-      // Registrar log positivo no Firebase
-      push(ref(db, 'acessos'), {
-        name: matchedUser.name,
-        role: matchedUser.role,
-        uid: uid,
-        timestamp: `${formattedDate} ${formattedTime}`,
-        authorized: true
-      }).catch((err) => console.error('Erro ao gravar acesso no Firebase:', err));
+    push(ref(db, 'acessos'), {
+      name: matchedUser ? matchedUser.name : 'Não Cadastrado',
+      role: matchedUser ? matchedUser.role : 'Desconhecido',
+      uid,
+      timestamp: `${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR')}`,
+      authorized: Boolean(matchedUser)
+    }).catch((err) => console.error('Erro ao gravar acesso no Firebase:', err));
 
-      // Enviar comando para abrir catraca no ESP32
-      sendSerialCommand('OPEN\n');
-    } else {
-      // Registrar log negativo no Firebase
-      push(ref(db, 'acessos'), {
-        name: 'Não Cadastrado',
-        role: 'Desconhecido',
-        uid: uid,
-        timestamp: `${formattedDate} ${formattedTime}`,
-        authorized: false
-      }).catch((err) => console.error('Erro ao gravar acesso no Firebase:', err));
-
-      // Enviar comando para negar no ESP32
-      sendSerialCommand('DENY\n');
-    }
+    // O comando não espera o Firebase: a resposta ao ESP32 é imediata
+    sendSerialCommand(matchedUser ? 'OPEN\n' : 'DENY\n');
   };
 
   // Libera writer e porta (usado ao desconectar ou se o cabo for removido)
@@ -236,8 +216,7 @@ export default function App() {
     set(push(ref(db, 'usuarios')), {
       name: newName,
       role: newRole,
-      uid: newUid.toUpperCase().trim(),
-      status: 'Ativo'
+      uid: newUid.toUpperCase().trim()
     }).catch((err) => console.error('Erro ao cadastrar crachá:', err));
 
     setNewName('');
@@ -349,9 +328,9 @@ export default function App() {
                   <div key={log.id} className="p-4 flex items-center justify-between hover:bg-gray-50 transition">
                     <div className="flex items-center space-x-3">
                       {log.authorized ? (
-                        <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
                       ) : (
-                        <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+                        <XCircle className="w-6 h-6 text-red-600 shrink-0" />
                       )}
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">{log.name}</p>
