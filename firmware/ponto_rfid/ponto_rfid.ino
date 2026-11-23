@@ -2,19 +2,24 @@
 #include <MFRC522.h>
 #include <ESP32Servo.h>
 
-#define SS_PIN    5
-#define RST_PIN   22
-#define SERVO_PIN 13
+#define SS_PIN        5
+#define RST_PIN       22
+#define SERVO_PIN     13
+#define LED_VERDE_PIN 25
+#define LED_VERMELHO_PIN 26
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 Servo catraca;
 
-// Abre a catraca por 3 segundos e tranca de novo
+// Abre a catraca por 3 segundos e sinaliza acesso liberado
 void liberarAcesso() {
   Serial.println("ACESSO_LIBERADO");
+  digitalWrite(LED_VERDE_PIN, HIGH);
+  digitalWrite(LED_VERMELHO_PIN, LOW);
   catraca.write(90);
   delay(3000);
   catraca.write(0);
+  digitalWrite(LED_VERDE_PIN, LOW);
 }
 
 // Lê o comando enviado pelo painel: "OPEN" ou "DENY"
@@ -28,11 +33,20 @@ void lerComandoSerial() {
     liberarAcesso();
   } else if (cmd == "DENY") {
     Serial.println("ACESSO_NEGADO");
+    digitalWrite(LED_VERDE_PIN, LOW);
+    digitalWrite(LED_VERMELHO_PIN, HIGH);
+    delay(1500);
+    digitalWrite(LED_VERMELHO_PIN, LOW);
   }
 }
 
 void setup() {
   Serial.begin(115200);
+
+  pinMode(LED_VERDE_PIN, OUTPUT);
+  pinMode(LED_VERMELHO_PIN, OUTPUT);
+  digitalWrite(LED_VERDE_PIN, LOW);
+  digitalWrite(LED_VERMELHO_PIN, LOW);
 
   SPI.begin(18, 19, 23, SS_PIN);  // SCK, MISO, MOSI, SS
   rfid.PCD_Init();
