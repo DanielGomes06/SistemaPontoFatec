@@ -5,7 +5,11 @@
   "parts": [
     { "type": "wokwi-esp32-devkit-v1", "id": "esp", "top": 0, "left": 0, "attrs": {} },
     { "type": "board-mfrc522", "id": "rfid2", "top": 45.35, "left": 166.64, "attrs": {} },
-    { "type": "wokwi-servo", "id": "servo1", "top": 218.8, "left": 220.8, "attrs": {} }
+    { "type": "wokwi-servo", "id": "servo1", "top": 218.8, "left": 220.8, "attrs": {} },
+    { "type": "wokwi-led", "id": "ledGreen", "top": 270, "left": 30, "attrs": { "color": "green" } },
+    { "type": "wokwi-resistor", "id": "resGreen", "top": 250, "left": 90, "attrs": { "value": "220" } },
+    { "type": "wokwi-led", "id": "ledRed", "top": 320, "left": 30, "attrs": { "color": "red" } },
+    { "type": "wokwi-resistor", "id": "resRed", "top": 300, "left": 90, "attrs": { "value": "220" } }
   ],
   "connections": [
     [ "esp:3V3", "rfid2:3.3V", "red", [ "v0" ] ],
@@ -17,7 +21,13 @@
     [ "esp:D5", "rfid2:SDA", "purple", [ "v0" ] ],
     [ "esp:GND.1", "servo1:GND", "black", [ "v0" ] ],
     [ "esp:VIN", "servo1:V+", "red", [ "v0" ] ],
-    [ "esp:D13", "servo1:PWM", "orange", [ "v0" ] ]
+    [ "esp:D13", "servo1:PWM", "orange", [ "v0" ] ],
+    [ "esp:D25", "resGreen:1", "green", [ "v0" ] ],
+    [ "resGreen:2", "ledGreen:A", "green", [ "v0" ] ],
+    [ "ledGreen:C", "esp:GND.1", "black", [ "v0" ] ],
+    [ "esp:D26", "resRed:1", "red", [ "v0" ] ],
+    [ "resRed:2", "ledRed:A", "red", [ "v0" ] ],
+    [ "ledRed:C", "esp:GND.1", "black", [ "v0" ] ]
   ],
   "dependencies": {}
 }
